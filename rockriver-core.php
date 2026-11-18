@@ -83,3 +83,42 @@ function rockriver_sanitize_number( $value ) {
 function rockriver_sanitize_yes_no( $value ) {
     return rest_sanitize_boolean( $value ) ? '1' : '0';
 }
+
+// 4. Bound fields on the front end. The fields store plain numbers, so this adds
+// the dollar sign and the words around them, and turns is_guided into a label.
+add_filter( 'block_bindings_source_value', 'rockriver_format_trip_values', 10, 4 );
+
+function rockriver_format_trip_values( $value, $source, $args, $block ) {
+    if ( 'core/post-meta' !== $source || empty( $args['key'] ) || '' === $value || null === $value ) {
+        return $value;
+    }
+    if ( empty( $block->context['postType'] ) || 'trip' !== $block->context['postType'] ) {
+        return $value;
+    }
+
+    switch ( $args['key'] ) {
+        case 'price':
+            return '$' . $value . ' per person';
+        case 'distance_miles':
+            return $value . ' miles';
+        case 'min_age':
+            return 'Ages ' . $value . ' and up';
+        case 'is_guided':
+            return rest_sanitize_boolean( $value ) ? 'Guided trip' : 'Self-guided with shuttle';
+    }
+
+    return $value;
+}
+
+// 5. List trips from shortest to longest on the Trips archive and the difficulty pages.
+add_action( 'pre_get_posts', 'rockriver_sort_trips' );
+
+function rockriver_sort_trips( $query ) {
+    if ( is_admin() || ! $query->is_main_query() ) {
+        return;
+    }
+    if ( $query->is_post_type_archive( 'trip' ) || $query->is_tax( 'difficulty' ) ) {
+        $query->set( 'meta_key', 'distance_miles' );
+        $query->set( 'orderby', array( 'meta_value_num' => 'ASC', 'date' => 'ASC' ) );
+    }
+}
